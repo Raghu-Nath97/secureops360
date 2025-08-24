@@ -1,0 +1,31 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+venv310/
+
+# VS Code & tooling
+.vscode/
+.idea/
+
+# Tests cache
+.pytest_cache/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Terraform
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/*.tfvars
+.terraform.lock.hcl
+
+# Local artifacts
+*.zip
+.env

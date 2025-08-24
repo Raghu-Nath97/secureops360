@@ -1,0 +1,1 @@
+{"statusCode": 200, "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"}, "body": "{\"status\": \"healthy\", \"service\": \"secureops360-ingest\", \"timestamp\": \"2025-08-24T11:09:57.374972+00:00\", \"version\": \"1.0.0\", \"path\": \"\"}", "isBase64Encoded": false}

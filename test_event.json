@@ -1,0 +1,17 @@
+{
+    "action":  "LoginSuccess",
+    "source":  "webapp",
+    "severity_hint":  1,
+    "actor":  {
+                  "ip":  "203.0.113.10",
+                  "id":  "u-1",
+                  "type":  "user"
+              },
+    "resource":  {
+                     "id":  "/login",
+                     "type":  "api"
+                 },
+    "payload":  {
+                    "ua":  "edge"
+                }
+}

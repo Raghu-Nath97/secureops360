@@ -1,0 +1,51 @@
+{
+  "timestamp": "2025-08-24T11:17:15.541720+00:00",
+  "total_tests_passed": 10,
+  "total_tests_failed": 0,
+  "success_rate": 100.0,
+  "overall_status": "PASSED",
+  "test_results": [
+    {
+      "test_name": "api_health",
+      "passed": 1,
+      "failed": 0,
+      "details": [
+        "\u2705 API Health check passed",
+        "   Service: secureops360-ingest",
+        "   Status: healthy"
+      ]
+    },
+    {
+      "test_name": "event_ingestion",
+      "passed": 3,
+      "failed": 0,
+      "details": [
+        "\u2705 Event 1 ingested successfully",
+        "\u2705 Event 2 ingested successfully",
+        "\u2705 Event 3 ingested successfully"
+      ]
+    },
+    {
+      "test_name": "aws_resources",
+      "passed": 5,
+      "failed": 0,
+      "details": [
+        "\u2705 Kinesis stream is active",
+        "\u2705 DynamoDB table events_live is active",
+        "\u2705 DynamoDB table intel_cache is active",
+        "\u2705 DynamoDB table assets_ctx is active",
+        "\u2705 DynamoDB table model_metrics is active"
+      ]
+    },
+    {
+      "test_name": "lambda_function",
+      "passed": 1,
+      "failed": 0,
+      "details": [
+        "\u2705 Lambda function is active",
+        "   Runtime: python3.11",
+        "   Memory: 512MB"
+      ]
+    }
+  ]
+}
