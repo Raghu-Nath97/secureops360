@@ -1,0 +1,47 @@
+name: Infrastructure Deployment
+
+on:
+  push:
+    branches: [main]
+    paths: ['infra/**']
+  pull_request:
+    branches: [main]
+    paths: ['infra/**']
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsSecureOps360
+        aws-region: ap-south-1
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+    
+    - name: Terraform Init
+      working-directory: infra/envs/dev
+      run: terraform init
+    
+    - name: Terraform Plan
+      working-directory: infra/envs/dev
+      run: terraform plan -no-color
+    
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main'
+      working-directory: infra/envs/dev
+      run: terraform apply -auto-approve
