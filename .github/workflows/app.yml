@@ -26,7 +26,7 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsSecureOps360
+        role-to-assume: arn:aws:iam::808677050841:role/GitHubActionsSecureOps360
         aws-region: ap-south-1
     
     - name: Login to ECR
@@ -37,5 +37,5 @@ jobs:
       run: |
         docker build -t secureops360-dev-${{ matrix.service }} .
         docker tag secureops360-dev-${{ matrix.service }}:latest \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/secureops360-dev-${{ matrix.service }}:latest
-        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.
+          808677050841.dkr.ecr.ap-south-1.amazonaws.com/secureops360-dev-${{ matrix.service }}:latest
+        docker push 808677050841.dkr.ecr.ap-south-1.amazonaws.com/secureops360-dev-${{ matrix.service }}:latest
