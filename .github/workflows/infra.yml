@@ -40,6 +40,15 @@ jobs:
     - name: Terraform Plan
       working-directory: infra/envs/dev
       run: terraform plan -no-color
+
+    - name: Create Lambda Deployment Package
+      working-directory: infra/envs/dev
+      run: |
+        # Create Lambda zip file
+        cd ../../../services/lambda-ingest
+        zip -j ../../infra/envs/dev/ingest_function.zip index.py
+        cd ../../infra/envs/dev
+        ls -la ingest_function.zip
     
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main'
