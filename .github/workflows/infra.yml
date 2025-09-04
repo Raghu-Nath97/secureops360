@@ -1,0 +1,55 @@
+name: Infrastructure Deployment
+
+on:
+  push:
+    branches: [main]
+    paths: ['infra/**', '.github/workflows/infra.yml']
+  pull_request:
+    branches: [main]
+    paths: ['infra/**', '.github/workflows/infra.yml']
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsSecureOps360
+          aws-region: ap-south-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Create Lambda Deployment Package
+        working-directory: infra/envs/dev
+        run: |
+          cd ../../../services/lambda-ingest
+          zip -j ../../infra/envs/dev/ingest_function.zip index.py
+          cd ../../infra/envs/dev
+          ls -l ingest_function.zip
+
+      - name: Terraform Init
+        working-directory: infra/envs/dev
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: infra/envs/dev
+        run: terraform plan -no-color
+
+      - name: Terraform Apply (main only)
+        if: github.ref == 'refs/heads/main'
+        working-directory: infra/envs/dev
+        run: terraform apply -auto-approve
