@@ -1,0 +1,186 @@
+name: 🏗️ Infrastructure Deployment
+
+on:
+  push:
+    branches: [main]
+    paths: 
+      - 'infra/**'
+      - 'services/lambda-ingest/**'
+      - '.github/workflows/infrastructure.yml'
+  pull_request:
+    branches: [main]
+    paths: 
+      - 'infra/**'
+      - 'services/lambda-ingest/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  AWS_REGION: ap-south-1
+  WORKING_DIRECTORY: infra/envs/dev
+
+jobs:
+  terraform-plan:
+    name: 🔍 Terraform Plan
+    runs-on: ubuntu-latest
+    outputs:
+      has-changes: ${{ steps.plan.outputs.changes }}
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsSecureOps360
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.0
+
+      - name: 📦 Create Lambda Deployment Package
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "🔧 Creating Lambda deployment package..."
+          cd ../../../services/lambda-ingest
+          
+          # Install dependencies if requirements.txt exists
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt -t .
+          fi
+          
+          # Create zip file
+          zip -r ../../infra/envs/dev/ingest_function.zip . -x "*.git*" "*.pytest_cache*" "__pycache__/*"
+          
+          cd ../../infra/envs/dev
+          ls -la ingest_function.zip
+          echo "✅ Lambda package created: $(ls -lh ingest_function.zip | awk '{print $5}')"
+
+      - name: 🚀 Terraform Init
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "🔧 Initializing Terraform..."
+          terraform init
+
+      - name: ✅ Terraform Validate
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "🔍 Validating Terraform configuration..."
+          terraform validate
+
+      - name: 📋 Terraform Plan
+        id: plan
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "📋 Creating Terraform plan..."
+          terraform plan -detailed-exitcode -no-color -out=tfplan.out
+          echo "changes=$([ $? -eq 2 ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: 📝 Comment Plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            
+            // Get plan output
+            const plan = execSync('cd ${{ env.WORKING_DIRECTORY }} && terraform show -no-color tfplan.out', { encoding: 'utf-8' });
+            
+            const comment = `## 🏗️ Terraform Plan Results
+            
+            ### 📊 Plan Summary
+            ${{ steps.plan.outcome == 'success' && '✅ Plan generated successfully' || '❌ Plan failed' }}
+            
+            <details>
+            <summary>📋 Show Plan Details</summary>
+            
+            \`\`\`terraform
+            ${plan}
+            \`\`\`
+            </details>
+            
+            **Triggered by:** ${{ github.actor }}
+            **Workflow:** ${{ github.workflow }}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  terraform-apply:
+    name: 🚀 Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: |
+      github.ref == 'refs/heads/main' && 
+      (needs.terraform-plan.outputs.has-changes == 'true' || github.event.inputs.action == 'apply')
+    environment: production
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsSecureOps360
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.0
+
+      - name: 📦 Create Lambda Deployment Package
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "🔧 Creating Lambda deployment package..."
+          cd ../../../services/lambda-ingest
+          
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt -t .
+          fi
+          
+          zip -r ../../infra/envs/dev/ingest_function.zip . -x "*.git*" "*.pytest_cache*" "__pycache__/*"
+          
+          cd ../../infra/envs/dev
+          echo "✅ Lambda package ready: $(ls -lh ingest_function.zip | awk '{print $5}')"
+
+      - name: 🚀 Terraform Init
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: terraform init
+
+      - name: ✅ Terraform Apply
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "🚀 Applying Terraform changes..."
+          terraform apply -auto-approve
+
+      - name: 📊 Output Results
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "📊 Infrastructure Outputs:"
+          terraform output -json | jq '.'
