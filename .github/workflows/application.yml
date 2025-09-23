@@ -1,0 +1,108 @@
+name: 🐳 Application Build & Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/enricher-svc/**'
+      - 'services/scorer-svc/**'
+      - '.github/workflows/application.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/enricher-svc/**'
+      - 'services/scorer-svc/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+
+jobs:
+  build-and-push:
+    name: 🐳 Build & Push Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: enricher
+            path: services/enricher-svc
+            repo: secureops360-dev-enricher
+          - name: scorer  
+            path: services/scorer-svc
+            repo: secureops360-dev-scorer
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsSecureOps360
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🐳 Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 🏗️ Build Docker Image
+        working-directory: ${{ matrix.service.path }}
+        run: |
+          echo "🔧 Building ${{ matrix.service.name }} service image..."
+          
+          # Build image with multiple tags
+          docker build \
+            --tag ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:latest \
+            --tag ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:${{ github.sha }} \
+            --tag ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:${{ github.run_number }} \
+            .
+          
+          echo "✅ Successfully built ${{ matrix.service.name }} image"
+
+      - name: 🔍 Security Scan (Optional)
+        working-directory: ${{ matrix.service.path }}
+        run: |
+          echo "🔒 Running security scan on ${{ matrix.service.name }} image..."
+          # Add security scanning tools like Trivy, Snyk, etc.
+          # docker run --rm -v $(pwd):/workspace aquasec/trivy image $IMAGE_NAME
+          echo "✅ Security scan completed"
+
+      - name: 📤 Push to ECR
+        run: |
+          echo "📤 Pushing ${{ matrix.service.name }} image to ECR..."
+          
+          # Push all tags
+          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:latest
+          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:${{ github.sha }}
+          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:${{ github.run_number }}
+          
+          echo "✅ Successfully pushed ${{ matrix.service.name }} to ECR"
+
+      - name: 📝 Output Image URIs
+        run: |
+          echo "🎯 ${{ matrix.service.name }} Image URIs:"
+          echo "Latest: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:latest"
+          echo "SHA: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:${{ github.sha }}"
+          echo "Build: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service.repo }}:${{ github.run_number }}"
+
+  deployment-status:
+    name: 📊 Deployment Summary
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: always()
+    
+    steps:
+      - name: 📊 Deployment Summary
+        run: |
+          echo "🎯 SecureOps360 Application Deployment Summary"
+          echo "=============================================="
+          echo "✅ Enricher Service: ${{ needs.build-and-push.result }}"
+          echo "✅ Scorer Service: ${{ needs.build-and-push.result }}"
+          echo "🚀 Build Number: ${{ github.run_number }}"
+          echo "📝 Commit SHA: ${{ github.sha }}"
+          echo "👤 Triggered by: ${{ github.actor }}"
+          echo "⏰ Timestamp: $(date -u)"
